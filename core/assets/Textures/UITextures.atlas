@@ -1,20 +1,20 @@
 
-UITextures.png
-size: 256, 128
+UiTextures.png
+size: 16, 16
 format: RGBA8888
 filter: Nearest, Nearest
 repeat: none
 plainred
   rotate: false
-  xy: 70, 2
-  size: 64, 64
-  orig: 64, 64
+  xy: 2, 2
+  size: 1, 1
+  orig: 1, 1
   offset: 0, 0
   index: -1
 plainwhite
   rotate: false
-  xy: 2, 2
-  size: 64, 64
-  orig: 64, 64
+  xy: 2, 7
+  size: 1, 1
+  orig: 1, 1
   offset: 0, 0
   index: -1

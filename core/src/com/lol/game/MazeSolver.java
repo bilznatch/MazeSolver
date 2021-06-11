@@ -10,6 +10,7 @@ import com.badlogic.gdx.graphics.GL20;
 import com.badlogic.gdx.graphics.OrthographicCamera;
 import com.badlogic.gdx.graphics.Texture;
 import com.badlogic.gdx.graphics.g2d.*;
+import com.badlogic.gdx.math.MathUtils;
 import com.badlogic.gdx.math.Vector2;
 import com.badlogic.gdx.physics.box2d.BodyDef;
 import com.badlogic.gdx.physics.box2d.World;
@@ -27,13 +28,13 @@ public class MazeSolver extends ApplicationAdapter implements InputProcessor {
 	OrthographicCamera camera;
 	Viewport viewport;
 	GlyphLayout layout = new GlyphLayout();
-	MazeUtils mazeUtils = new MazeUtils();
-	Runner runner = new Runner();
+	boolean highspeed = false;
 	/** Initialization Methods **/
 	final float FONT_SMOOTHING = 1/8f;
 	float fontScale = 3;
-	Maze maze = new Maze();
-	int mode = 0;
+	float resolution;
+	int mazeWidth = 50;
+	MazeGenerator mg;
 	String modeText = "";
 	/** Shaders **/
 	DistanceFieldShader fontShader;
@@ -43,6 +44,9 @@ public class MazeSolver extends ApplicationAdapter implements InputProcessor {
 	ArrayList<TextureRegion> uiTextures = new ArrayList<>();
 	ArrayList<TextureRegion> playerTextures = new ArrayList<>();
 	BitmapFont font;
+	Runner runner;
+	CheckBox[] CBoxArray = new CheckBox[10];
+
 
 	@Override
 	public void create () {
@@ -52,12 +56,16 @@ public class MazeSolver extends ApplicationAdapter implements InputProcessor {
 		viewport = new FitViewport(1920,1080,camera);
 		viewport.update(Gdx.graphics.getWidth(),Gdx.graphics.getHeight());
 		Gdx.input.setInputProcessor(this);
+		Gdx.graphics.setUndecorated(true);
 		Gdx.graphics.setFullscreenMode(Gdx.graphics.getDisplayMode());
+		//Gdx.graphics.setWindowedMode(800,450);
 		createVectors();
+		createCheckBoxes();
 		loadTextures();
-		maze.maze = mazeUtils.createMaze(21,21);
 		fontShader = new DistanceFieldShader();
-		runner.setMaze(maze);
+		mg = new MazeGenerator(mazeWidth,mazeWidth);
+		resolution = 45f * (21f/mazeWidth);
+		runner = new Runner(mg);
 	}
 	public void loadTextures(){
 		uiAtlas = new TextureAtlas(Gdx.files.internal("textures/UITextures.atlas"));
@@ -74,67 +82,77 @@ public class MazeSolver extends ApplicationAdapter implements InputProcessor {
 		mouse = new Vector2(0,0);
 		screenMouse = new Vector2(0,0);
 	}
-
+	public void createCheckBoxes(){
+		CBoxArray[0] = new CheckBox(1200,1000,"Autorun");
+		CBoxArray[1] = new CheckBox(1200,900,"Show Deletions");
+		CBoxArray[2] = new CheckBox(1200,800,"Highlight Path");
+		CBoxArray[3] = new CheckBox(1200,700,"Highlight Deletions");
+		CBoxArray[4] = new CheckBox(1200,600,"Highspeed");
+		CBoxArray[5] = new CheckBox(1200,500,"Loop");
+	}
 	/** Render methods **/
 	@Override
 	public void render () {
 		Gdx.gl.glClearColor(0.2f, 0.2f, 0.2f, 1);
-		Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT);
+		Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT | GL20.GL_DEPTH_BUFFER_BIT | (Gdx.graphics.getBufferFormat().coverageSampling?GL20.GL_COVERAGE_BUFFER_BIT_NV:0));
 		batch.setProjectionMatrix(camera.combined);
 		setMouse();
+		updateCheckVariables();
 		if(runner.autorun){
-			updateRunner();
+			if(highspeed){
+				for(int i = 0; i < 5;i++){
+					if(!runner.finished){
+						runner.update(0);
+					}else{
+						break;
+					}
+				}
+			}else{
+				runner.update(0);
+			}
 		}
 		batch.begin();
-		maze.drawMaze(batch,uiTextures.get(0));
-		batch.setColor(Color.BLUE);
-		batch.draw(uiTextures.get(0),200+runner.x*32,200+runner.y*32,32,32);
-		if(runner.showNext){
-			batch.setColor(Color.YELLOW);
-			batch.draw(uiTextures.get(0),200+runner.nextX*32,200+runner.nextY*32,32,32);
-		}
-		if(runner.showRight){
-			batch.setColor(Color.ORANGE);
-			batch.draw(uiTextures.get(0),200+runner.rightX*32,200+runner.rightY*32,32,32);
-		}
-		drawStrings();
-		batch.end();
-	}
-	public void drawStrings(){
-		if(mode==0){
-			modeText="Right Hand Rule";
-		}else if(mode==1){
-			modeText="Depth First Search";
-		}else{
-			modeText="Random";
-		}
+		drawMaze();
 		batch.setShader(fontShader);
 		fontShader.setSmoothing(1/8f);
-		font.getData().setScale(0.75f);
-		layout.setText(font,
-				"Controls\n" +
-				"p: place\n" +
-				"s: step\n" +
-				"r: autorun\n" +
-				"f: fill\n" +
-				"d: show deletions: " + maze.showDeletions + "\n" +
-				"n: show next: " + runner.showNext + "\n"+
-				"w: show right: " + runner.showRight +"\n"+
-				"1/2: mode: " + modeText + "\n" +
-				"3: loop: " + runner.loopRandom + "\n" +
-				"esc: exit");
-		font.draw(batch,layout,1000,850);
+		drawUI();
+		drawStrings();
 		batch.setShader(null);
+		batch.end();
+	}
+	public void drawMaze(){
+		mg.drawMaze(batch, uiTextures.get(0));
+		runner.draw(batch, uiTextures.get(0));
+	}
+	public void drawUI(){
+		for(CheckBox cb: CBoxArray){
+			if(cb == null) continue;
+			cb.draw(batch,uiTextures.get(0),font,layout);
+		}
+	}
+	public void drawStrings(){
 
 	}
-	public void updateRunner(){
-		runner.move(mode, maze.getNeighbors(runner.x,runner.y));
-	}
-
 	public void setMouse(){
 		mouse.set(Gdx.input.getX(),Gdx.input.getY());
 		viewport.unproject(mouse);
 		screenMouse.set(mouse.x-(camera.position.x-960),mouse.y-(camera.position.y-540));
+	}
+	public void updateCheckVariables(){
+		if (!runner.finished) {
+			runner.autorun = CBoxArray[0].checked;
+		}else{
+			CBoxArray[0].checked = false;
+		}
+		mg.showDeletions = CBoxArray[1].checked;
+		mg.highlightPath = CBoxArray[2].checked;
+		mg.highlightDeletions = CBoxArray[3].checked;
+		highspeed = CBoxArray[4].checked;
+		if(!runner.finished){
+			runner.loop = CBoxArray[5].checked;
+		}else{
+			if(CBoxArray[5].checked)runner.reset();
+		}
 	}
 
 	/** Update methods **/
@@ -165,39 +183,18 @@ public class MazeSolver extends ApplicationAdapter implements InputProcessor {
 
 	@Override
 	public boolean keyTyped(char character) {
-		if(character == 'p'){
-			runner.setPosition(mouse);
-		}else if(character == 's'){
-			updateRunner();
-		}else if(character == 'r'){
-			runner.autorun = !runner.autorun;
-		}else if(character == 'n'){
-			runner.showNext = !runner.showNext;
-		}else if(character == 'w'){
-			runner.showRight = !runner.showRight;
-		}else if(character == '3'){
-			runner.loopRandom = !runner.loopRandom;
-		}else if(character == 'f'){
-			maze.maze[runner.x][runner.y]=-1;
-			maze.fillFromEnds();
-			runner.loopRandom = false;
-		}else if(character == 'd'){
-			maze.showDeletions = !maze.showDeletions;
-		}else if(character=='1'){
-			mode=Math.abs(mode-1);
-		}else if(character == '2'){
-			if(mode!=2){
-				mode=2;
-			}else mode=0;
-		}else if(character==27)Gdx.app.exit();
+		if(character=='p'){
+			mg.generateNewMaze(mg.maze.length,mg.maze.length);
+		}
+		if(character==27)Gdx.app.exit();
 		return false;
 	}
 
 	@Override
 	public boolean touchDown(int screenX, int screenY, int pointer, int button) {
-		if(mouse.x >200 && mouse.x < 200+32*21
-		&& mouse.y > 200 && mouse.y < 200+32*21){
-			runner.setPosition(mouse);
+		for(CheckBox c: CBoxArray){
+			if(c == null) continue;
+			c.isClicked(mouse);
 		}
 		return false;
 	}
