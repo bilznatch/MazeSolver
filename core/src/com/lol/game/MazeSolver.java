@@ -3,6 +3,7 @@ package com.lol.game;
 import box2dLight.RayHandler;
 import com.badlogic.gdx.ApplicationAdapter;
 import com.badlogic.gdx.Gdx;
+import com.badlogic.gdx.Input;
 import com.badlogic.gdx.InputProcessor;
 import com.badlogic.gdx.graphics.Color;
 import com.badlogic.gdx.graphics.Colors;
@@ -16,6 +17,7 @@ import com.badlogic.gdx.physics.box2d.BodyDef;
 import com.badlogic.gdx.physics.box2d.World;
 import com.badlogic.gdx.utils.viewport.FitViewport;
 import com.badlogic.gdx.utils.viewport.Viewport;
+import com.lol.game.MazeCell;
 
 import java.awt.*;
 import java.util.ArrayList;
@@ -31,6 +33,8 @@ public class MazeSolver extends ApplicationAdapter implements InputProcessor {
 	boolean highspeed = false;
 	/** Initialization Methods **/
 	final float FONT_SMOOTHING = 1/8f;
+	final int SCREEN_W = 1920;
+	final int SCREEN_H = 1080;
 	float fontScale = 3;
 	float resolution;
 	int mazeWidth = 50;
@@ -46,25 +50,24 @@ public class MazeSolver extends ApplicationAdapter implements InputProcessor {
 	BitmapFont font;
 	Runner runner;
 	CheckBox[] CBoxArray = new CheckBox[10];
-
+	int count = 0;
 
 	@Override
 	public void create () {
 		batch = new SpriteBatch();
 		camera = new OrthographicCamera();
-		camera.setToOrtho(false,1920,1080);
-		viewport = new FitViewport(1920,1080,camera);
+		camera.setToOrtho(false,SCREEN_W,SCREEN_H);
+		viewport = new FitViewport(SCREEN_W,SCREEN_H,camera);
 		viewport.update(Gdx.graphics.getWidth(),Gdx.graphics.getHeight());
 		Gdx.input.setInputProcessor(this);
 		Gdx.graphics.setUndecorated(true);
-		Gdx.graphics.setFullscreenMode(Gdx.graphics.getDisplayMode());
-		//Gdx.graphics.setWindowedMode(800,450);
+		//Gdx.graphics.setFullscreenMode(Gdx.graphics.getDisplayMode());
+		Gdx.graphics.setWindowedMode(800,450);
 		createVectors();
 		createCheckBoxes();
 		loadTextures();
 		fontShader = new DistanceFieldShader();
 		mg = new MazeGenerator(mazeWidth,mazeWidth);
-		resolution = 45f * (21f/mazeWidth);
 		runner = new Runner(mg);
 	}
 	public void loadTextures(){
@@ -89,34 +92,27 @@ public class MazeSolver extends ApplicationAdapter implements InputProcessor {
 		CBoxArray[3] = new CheckBox(1200,700,"Highlight Deletions");
 		CBoxArray[4] = new CheckBox(1200,600,"Highspeed");
 		CBoxArray[5] = new CheckBox(1200,500,"Loop");
+		CBoxArray[6] = new CheckBox(1200,400,"New Maze");
 	}
 	/** Render methods **/
 	@Override
 	public void render () {
 		Gdx.gl.glClearColor(0.2f, 0.2f, 0.2f, 1);
-		Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT | GL20.GL_DEPTH_BUFFER_BIT | (Gdx.graphics.getBufferFormat().coverageSampling?GL20.GL_COVERAGE_BUFFER_BIT_NV:0));
+		Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT | GL20.GL_DEPTH_BUFFER_BIT |
+				(Gdx.graphics.getBufferFormat().coverageSampling?GL20.GL_COVERAGE_BUFFER_BIT_NV:0));
+		viewport.apply();
 		batch.setProjectionMatrix(camera.combined);
 		setMouse();
 		updateCheckVariables();
-		if(runner.autorun){
-			if(highspeed){
-				for(int i = 0; i < 5;i++){
-					if(!runner.finished){
-						runner.update(0);
-					}else{
-						break;
-					}
-				}
-			}else{
-				runner.update(0);
-			}
-		}
+		updateRunner();
+		drawScene();
+	}
+	public void drawScene(){
 		batch.begin();
 		drawMaze();
 		batch.setShader(fontShader);
-		fontShader.setSmoothing(1/8f);
+		fontShader.setSmoothing(FONT_SMOOTHING);
 		drawUI();
-		drawStrings();
 		batch.setShader(null);
 		batch.end();
 	}
@@ -130,13 +126,11 @@ public class MazeSolver extends ApplicationAdapter implements InputProcessor {
 			cb.draw(batch,uiTextures.get(0),font,layout);
 		}
 	}
-	public void drawStrings(){
 
-	}
 	public void setMouse(){
 		mouse.set(Gdx.input.getX(),Gdx.input.getY());
 		viewport.unproject(mouse);
-		screenMouse.set(mouse.x-(camera.position.x-960),mouse.y-(camera.position.y-540));
+		screenMouse.set(mouse.x-(camera.position.x-SCREEN_W/2f),mouse.y-(camera.position.y-SCREEN_H/2f));
 	}
 	public void updateCheckVariables(){
 		if (!runner.finished) {
@@ -152,6 +146,26 @@ public class MazeSolver extends ApplicationAdapter implements InputProcessor {
 			runner.loop = CBoxArray[5].checked;
 		}else{
 			if(CBoxArray[5].checked)runner.reset();
+		}
+		if(CBoxArray[6].checked){
+			CBoxArray[6].checked = false;
+			mg.generateNewMaze(mg.maze.length,mg.maze.length);
+		}
+	}
+	public void updateRunner(){
+		if(runner.autorun){
+			if(highspeed){
+				if(!runner.finished){
+					runner.update(0);
+				}
+			}else{
+				if(count<2){
+					count++;
+				}else{
+					runner.update(0);
+					count = 0;
+				}
+			}
 		}
 	}
 
@@ -173,6 +187,13 @@ public class MazeSolver extends ApplicationAdapter implements InputProcessor {
 
 	@Override
 	public boolean keyDown(int keycode) {
+		if(keycode == Input.Keys.F11){
+			if(Gdx.graphics.isFullscreen()){
+				Gdx.graphics.setWindowedMode(800,450);
+			}else{
+				Gdx.graphics.setFullscreenMode(Gdx.graphics.getDisplayMode());
+			}
+		}
 		return false;
 	}
 

@@ -114,8 +114,8 @@ public class Runner {
 
     }
     public void draw(SpriteBatch batch, TextureRegion tex){
-        float resolution = 32f * (30f/mg.maze.length);
+        float resolution = 35f * (30f/mg.maze.length);
         batch.setColor(Color.CYAN);
-        batch.draw(tex,100+x*resolution,100+y*resolution,resolution,resolution);
+        batch.draw(tex,10+(x*resolution)+(resolution*0.1f),10+(y*resolution)+(resolution*0.1f),resolution*0.80f,resolution*0.80f);
     }
 }
